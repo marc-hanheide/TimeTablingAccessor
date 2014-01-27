@@ -1,3 +1,4 @@
+#!/usr/bin/python
 from StringIO import StringIO
 
 import requests
