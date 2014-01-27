@@ -56,4 +56,6 @@ class RoomTTParser:
 
 tt = RoomTTParser()
 
+print "Content-Type: text/plain; charset=UTF-8"    # Print headers
+print ""                    # Signal end of headers
 print(tt.get_ical())
