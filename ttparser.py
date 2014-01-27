@@ -23,6 +23,10 @@ class RoomTTParser:
 
     def __init__(self, room='MC3204', range=30):
         self._query_room = room
+	self._range = range
+	self._cal = Calendar()
+	self._cal.add('prodid', '-//University of Lincoln//Room TimeTable ICal Accessor//')
+	self._cal.add('version', '2.0')
 
     def get_ical(self):
         d = date.today()
@@ -63,6 +67,7 @@ class RoomTTParser:
                 self._cal.add_component(event)
 
 
+#cgi.test()
 fs = cgi.FieldStorage()
 
 if "room" not in fs:
@@ -75,7 +80,7 @@ if "range" not in fs:
 else:
     rge = int(fs["range"].value)
 
-print(fs)
+#print(fs)
 
 tt = RoomTTParser(room=room, range=rge)
 
