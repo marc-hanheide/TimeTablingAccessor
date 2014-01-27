@@ -10,13 +10,18 @@ from icalendar import Calendar, Event, vText
 from datetime import date, datetime, timedelta
 from pytz import timezone
 
+import cgi
+import cgitb
+
+cgitb.enable()
+
 
 class RoomTTParser:
     _cal = Calendar()
-    _query_room = 'MC3204'
-    _range = 1
+    _query_rooms = 'MC3204'
+    _range = 30
 
-    def __init__(self, room='MC3204', _range=1):
+    def __init__(self, room='MC3204', range=30):
         self._query_room = room
 
     def get_ical(self):
@@ -58,7 +63,21 @@ class RoomTTParser:
                 self._cal.add_component(event)
 
 
-tt = RoomTTParser()
+fs = cgi.FieldStorage()
+
+if "room" not in fs:
+    room = 'MC3204'
+else:
+    room = fs["room"].value
+
+if "range" not in fs:
+    rge = 14
+else:
+    rge = int(fs["range"].value)
+
+print(fs)
+
+tt = RoomTTParser(room=room, range=rge)
 
 print "Content-Type: text/calendar; charset=UTF-8"    # Print headers
 #print "Content-Type: text/html; charset=UTF-8"    # Print headers
