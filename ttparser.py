@@ -14,9 +14,9 @@ from pytz import timezone
 class RoomTTParser:
     _cal = Calendar()
     _query_room = 'MC3204'
-    _range = 30
+    _range = 1
 
-    def __init__(self, room='MC3204', _range=30):
+    def __init__(self, room='MC3204', _range=1):
         self._query_room = room
 
     def get_ical(self):
@@ -30,14 +30,18 @@ class RoomTTParser:
                    'Step': '3',
                    'Site': 'BR-000'}
         r = requests.get("http://stafftimetables.lincoln.ac.uk/V2/UL/Reports/RoomTT.asp", data=payload)
-
         htmlparser = etree.HTMLParser()
         tree = etree.parse(StringIO(r.text), htmlparser)
 
         tz_london = timezone('Europe/London')
-        s = tree.xpath('/html/body/font/table/tr/td/table/tr/td/table/tr[2]/td/table[tr[2]/td]')
+#	tmp=tree.getroot().xpath('/html/*/font/table');
+#	print(len(tmp))
+#	print(tmp[0].tag)
+#        print(etree.tostring(tmp[0]))
+	
+        s = tree.xpath('/html/*/font/table/tr/td/table/tr/td/table/tr[2]/td/table[tr[2]/td]')
         if (len(s) > 0):
-            room = tree.xpath('/html/body/font/table/tr/td/table/tr/td/table/tr[2]/td[1]/font/b/text()')[0]
+            room = tree.xpath('/html/*/font/table/tr/td/table/tr/td/table/tr[2]/td[1]/font/b/text()')[0]
             for se in s:
                 event = Event()
                 name = se.xpath('tr[1]/td/font/text()')
@@ -56,6 +60,7 @@ class RoomTTParser:
 
 tt = RoomTTParser()
 
-print "Content-Type: text/plain; charset=UTF-8"    # Print headers
+print "Content-Type: text/calendar; charset=UTF-8"    # Print headers
+#print "Content-Type: text/html; charset=UTF-8"    # Print headers
 print ""                    # Signal end of headers
 print(tt.get_ical())
