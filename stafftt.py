@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 import cgi
 import cgitb
 import logging
+from re import split
 
 logging.basicConfig()
 
@@ -17,28 +18,30 @@ cgitb.enable()
 
 class TTParser:
     _cal = Calendar()
+    _tz_london = timezone('Europe/London')
+    # the start date has to be the first Monday of the teaching period
+    _start_date = date(2014, 9, 15)
+    _range = 51 * 7
 
     def __init__(self):
         self._cal = Calendar()
-        self._cal.add('prodid', '-//University of Lincoln//Room TimeTable ICal Accessor//')
+        self._cal.add('prodid', '-//University of Lincoln//TimeTable//')
         self._cal.add('version', '2.0')
         self._baseUrl = "http://stafftimetables.lincoln.ac.uk/V2/UL/Reports/"
 
-
     def ical(self):
-        d = date.today()
-        for x in range(0, self._range):
+        #for x in range(0, self._range):
+        for x in range(49, 70):
             try:
-                self.add_day(d + timedelta(x))
+                self.query(self._start_date + timedelta(x))
             except Exception as ex:
                 logging.getLogger(__name__).warning(
-                    'failed to add_day for ' + str(d + timedelta(x)) + ': ' + str(type(ex)) + ': ' + ex.message)
+                    'failed to add_day for '
+                    + str(self._start_date + timedelta(x))
+                    + ': ' + str(type(ex)) + ': ' + ex.message)
         return self._cal.to_ical()
 
-    def create_event(self, name, room, the_day, time):
-        tv = time.replace(' ', '').replace(':', '-').split('-')
-        dBegin = datetime(the_day.year, the_day.month, the_day.day, int(tv[0]), int(tv[1]), tzinfo=self._tz_london)
-        dEnd = datetime(the_day.year, the_day.month, the_day.day, int(tv[2]), int(tv[3]), tzinfo=self._tz_london)
+    def create_event(self, name, room, the_day, dBegin, dEnd):
         event = Event()
         event.add('summary', name)
         event.add('dtstart', dBegin)
@@ -49,8 +52,6 @@ class TTParser:
 
 class LecturerTTParser(TTParser):
     _lecturer = '003092'
-    _tz_london = timezone('Europe/London')
-    _start_date = date(2014, 9,15)
 
     def __init__(self, lecturer='003092'):
         self._lecturer = lecturer
@@ -64,13 +65,14 @@ class LecturerTTParser(TTParser):
 
     def date_to_query(self, d):
         td = d - self._start_date
-	week = td.days // 7
-	day_of_week = td.days % 7 + 1
-        print week,day_of_week
-	return week, day_of_week
+        week = td.days // 7
+        day_of_week = td.days % 7 + 1
+        return week, day_of_week
 
     def query(self, day):
         week, day_of_week = self.date_to_query(day)
+        if (day_of_week > 5):
+            return
         payload = {'Lecturer': self._lecturer,
                    'Step': '3',
                    'FromWeek': week,
@@ -79,28 +81,36 @@ class LecturerTTParser(TTParser):
                    'ToDay': day_of_week,
                    'Instance': 'All'}
         tree = self.request("LecturerTT.asp", payload)
-	#print etree.tostring(tree,pretty_print=True)
+        #print etree.tostring(tree,pretty_print=True)
         s = tree.xpath('//table[@rules="rows"]')
-        events=[]
-	for se in s:
-		event={}
-		#print etree.tostring(se,pretty_print=True)
-		event['module'] = se.xpath('tr[1]/td//text()')[0]
-                event['room'] = se.xpath('tr[2]/td//text()')[0]
-                event['names'] = se.xpath('tr[3]/td//text()')[0]
-                event['type'] = se.xpath('tr[4]/td//text()')[0]
-                event['weeks'] = se.xpath('tr[5]/td//text()')[0]
-                event['time'] = se.xpath('tr[6]/td//text()')[0]
-		event['date'] = day
-		events.append(event)
-  		print event
-        #if (len(s) > 0):
-        #    room = tree.xpath('/html/*/font/table/tr/td/table/tr/td/table/tr[2]/td[1]/font/b/text()')[0]
-        #    for se in s:
-        #        name = se.xpath('tr[1]/td/font/text()')[0]
-        #        time = se.xpath('tr[last()]/td/font/text()')[0]
-        #        event = self.create_event(name, room, the_day, time)
-        #        self._cal.add_component(event)
+
+        for se in s:
+            event = Event()
+
+            #print etree.tostring(se,pretty_print=True)
+            ev_module = se.xpath('tr[1]/td//text()')[0]
+            ev_room = se.xpath('tr[2]/td//text()')[0]
+            ev_names = se.xpath('tr[3]/td//text()')[0]
+            ev_type = se.xpath('tr[4]/td//text()')[0]
+            ev_weeks = se.xpath('tr[5]/td//text()')[0]
+            ev_rawtime = se.xpath('tr[6]/td//text()')[0]
+            splitstr = split('\W+', ev_rawtime)
+            ev_start_time = datetime(day.year, day.month, day.day,
+                                     int(splitstr[0]), int(splitstr[1]),
+                                     tzinfo=self._tz_london)
+            ev_end_time = datetime(day.year, day.month, day.day,
+                                   int(splitstr[2]), int(splitstr[3]),
+                                   tzinfo=self._tz_london)
+
+            event.add('summary', ev_module + ' - ' + ev_type)
+            event.add('dtstart', ev_start_time)
+            event.add('dtend', ev_end_time)
+            event['location'] = vText(ev_room)
+            event['description'] = vText('names: ' + ev_names
+                                         + ', weeks: ' + ev_weeks)
+            self._cal.add_component(event)
+        
+
 
 
 #cgi.test()
@@ -118,5 +128,5 @@ tt = LecturerTTParser(lecturer=lecturer)
 print "Content-Type: text/calendar; charset=UTF-8"    # Print headers
 #print "Content-Type: text/html; charset=UTF-8"    # Print headers
 print ""                    # Signal end of headers
-tt.query(date(2014,12,15))
-#print(tt.ical())
+tt.query(date(2014, 12, 15))
+print(tt.ical())
