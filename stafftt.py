@@ -30,8 +30,8 @@ class TTParser:
         self._baseUrl = "http://stafftimetables.lincoln.ac.uk/V2/UL/Reports/"
 
     def ical(self):
-        #for x in range(0, self._range):
-        for x in range(49, 70):
+        for x in range(0, self._range):
+        #for x in range(49, 70):
             try:
                 self.query(self._start_date + timedelta(x))
             except Exception as ex:
