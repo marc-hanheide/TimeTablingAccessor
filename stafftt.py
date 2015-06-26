@@ -15,12 +15,16 @@ from pytz import timezone
 
 cgitb.enable()
 
+import pyfscache
+cache_it = pyfscache.FSCache('/var/www/tt/cache',
+                             days=7)
+
 
 class TTParser:
     _cal = Calendar()
     _tz_london = timezone('Europe/London')
     # the start date has to be the first Monday of the teaching period
-    _start_date = date(2014, 9, 15)
+    _start_date = date(2015, 9, 14)
     _range = 51 * 7
 
     def __init__(self):
@@ -29,11 +33,11 @@ class TTParser:
         self._cal.add('version', '2.0')
         self._baseUrl = "http://stafftimetables.lincoln.ac.uk/V2/UL/Reports/"
 
-    def ical(self):
+    def ical(self, lecturer):
         for x in range(0, self._range):
         #for x in range(49, 70):
             try:
-                self.query(self._start_date + timedelta(x))
+                self.query(self._start_date + timedelta(x), lecturer)
             except Exception as ex:
                 logging.getLogger(__name__).warning(
                     'failed to add_day for '
@@ -51,16 +55,20 @@ class TTParser:
 
 
 class LecturerTTParser(TTParser):
-    _lecturer = '003092'
 
-    def __init__(self, lecturer='003092'):
-        self._lecturer = lecturer
+    def __init__(self):
         TTParser.__init__(self)
 
     def request(self, url, payload):
-        r = requests.get(self._baseUrl + url, data=payload)
         html_parser = etree.HTMLParser()
-        tree = etree.parse(StringIO(r.text), html_parser)
+        k = str(payload)
+        if k in cache_it:
+            t = cache_it[k]
+        else:            
+            r = requests.get(self._baseUrl + url, data=payload)
+            t = r.text
+            cache_it[k] = t
+        tree = etree.parse(StringIO(t), html_parser)
         return tree
 
     def date_to_query(self, d):
@@ -69,11 +77,11 @@ class LecturerTTParser(TTParser):
         day_of_week = td.days % 7 + 1
         return week, day_of_week
 
-    def query(self, day):
+    def query(self, day, lecturer):
         week, day_of_week = self.date_to_query(day)
         if (day_of_week > 5):
             return
-        payload = {'Lecturer': self._lecturer,
+        payload = {'Lecturer': lecturer,
                    'Step': '3',
                    'FromWeek': week,
                    'ToWeek': week,
@@ -123,10 +131,9 @@ else:
 
 #print(fs)
 
-tt = LecturerTTParser(lecturer=lecturer)
+tt = LecturerTTParser()
 
 print "Content-Type: text/calendar; charset=UTF-8"    # Print headers
 #print "Content-Type: text/html; charset=UTF-8"    # Print headers
 print ""                    # Signal end of headers
-tt.query(date(2014, 12, 15))
-print(tt.ical())
+print(tt.ical(lecturer))
