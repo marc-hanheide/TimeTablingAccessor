@@ -112,7 +112,7 @@ class SubjectTTParser(TTParser):
 
 
 
-                event.add('summary', module + ' - ' + session)
+                event.add('summary', module + ': ' + title + ' - ' + session)
                 event.add('dtstart', ev_start_time)
                 event.add('dtend', ev_end_time)
                 event['location'] = vText(room)
